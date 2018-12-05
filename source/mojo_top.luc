@@ -1,0 +1,324 @@
+module mojo_top (
+    input clk,              // 50MHz clock
+    input rst_n,            // reset button (active low)
+    output led [8],         // 8 user controllable LEDs
+    input cclk,             // configuration clock, AVR ready when high
+    output spi_miso,        // AVR SPI MISO
+    input spi_ss,           // AVR SPI Slave Select
+    input spi_mosi,         // AVR SPI MOSI
+    input spi_sck,          // AVR SPI Clock
+    output spi_channel [4], // AVR general purpose pins (used by default to select ADC channel)
+    input avr_tx,           // AVR TX (FPGA RX)
+    output avr_rx,          // AVR RX (FPGA TX)
+    input avr_rx_busy,       // AVR RX buffer full
+    
+    input rbutton,
+    input bbutton,
+    input gbutton,
+    input ybutton,
+    input undobutton,
+    input submitbutton,
+    
+    
+    output bigled1[4],
+    output bigled2[4],
+    output bigled3[4],
+    output bigled4[4],
+    output bigled5[4],
+    output bigled6[4],
+    output smallled1[4],
+    output smallled2[4],
+    output smallled3[4],
+    output smallled4[4],
+    output smallled5[4],
+    output smallled6[4],
+    
+    output io_seg[7],
+    output io_sel[4]
+  ) {
+  
+  sig rst; 
+  sig rbuttonstate;
+  sig bbuttonstate;
+  sig gbuttonstate;
+  sig ybuttonstate;
+  sig undobuttonstate;
+  sig submitbuttonstate;
+  
+  userinput_dp userinput;
+  toled tosmallled;
+  toled tobigled;
+  bin_to_dec bin_to_dec (#DIGITS(2));
+  alu alu;
+  
+  .clk(clk) {
+    // The reset conditioner is used to synchronize the reset signal to the FPGA
+    // clock. This ensures the entire FPGA comes out of reset at the same time.
+    reset_conditioner reset_cond;
+    .rst(rst){ 
+      button_press press_r;
+      button_press press_g;
+      button_press press_b;
+      button_press press_y;
+      button_press press_submit;
+      button_press press_undo;
+      
+      randomnum randomnum;
+      
+      fsm state = {PREP,IDLE,ONE,TWO,THREE,FOUR,FIVE,SIX,END};
+      dff ledmatrix[6][3];
+      dff ledmatrix2[6][3];
+      dff score[7];
+      dff layer[3];
+      
+      timer timer;
+      multi_seven_seg seg(#DIGITS(4));
+      }
+  }
+  
+  always {
+    reset_cond.in = ~rst_n; // input raw inverted reset signal
+    rst = reset_cond.out;   // conditioned reset
+    
+    led = 8h00;             // turn LEDs off
+    spi_miso = bz;          // not using SPI
+    spi_channel = bzzzz;    // not using flags
+    avr_rx = bz;            // not using serial port
+    
+    alu.a = 16b0;           // default values for alu
+    alu.alufn = 6h0;
+    alu.b = 16b0;
+    
+    
+    // Connect seven seg display to timer and score
+    score.d = 7b0;
+    bin_to_dec.value = score.q;
+    seg.values = {timer.digits[1], timer.digits[0], bin_to_dec.digits[1], bin_to_dec.digits[0]};
+    timer.reset = 0;
+    //seg.values = {4h0,4h0,bin_to_dec.digits[1], bin_to_dec.digits[0]};
+
+    
+    io_seg = seg.seg;
+    io_sel = seg.sel;
+    
+    // Button conditioner and edge detector for every button
+    press_r.button=~rbutton;
+    press_g.button=~gbutton;
+    press_b.button=~bbutton;
+    press_y.button=~ybutton;
+    press_submit.button=~submitbutton;
+    press_undo.button=~undobutton;
+    
+    rbuttonstate = press_r.count;
+    bbuttonstate = press_b.count;
+    gbuttonstate = press_g.count;
+    ybuttonstate = press_y.count;
+    submitbuttonstate = press_submit.count;
+    undobuttonstate = press_undo.count;
+    
+    
+    /////////////////// Connect modules /////////////////////
+    
+    // Connect userinput buttons
+    userinput.rbutton = press_r.count;
+    userinput.gbutton = press_g.count;
+    userinput.bbutton = press_b.count;
+    userinput.ybutton = press_y.count;
+    userinput.undobutton = press_undo.count;
+    userinput.submitbutton = press_submit.count;
+    
+    // Connect other inputs for userinput
+    layer.d = 3b0;
+    userinput.layer = layer.q;
+    userinput.in = 6x{{3b0}};
+    ledmatrix.d = userinput.out;
+    userinput.in = ledmatrix.q; 
+    tobigled.in = userinput.out; 
+    
+    // Connect RNG inputs and outputs
+    randomnum.submitbutton = press_submit.count;
+    ledmatrix2.d = randomnum.out;
+    randomnum.in = ledmatrix2.q;
+    tosmallled.in = ledmatrix2.q;
+    
+    // Connect to big led matrix and small led matrix
+    smallled1 = tosmallled.led1;
+    smallled2 = tosmallled.led2;
+    smallled3 = tosmallled.led3;
+    smallled4 = tosmallled.led4;
+    smallled5 = tosmallled.led5;
+    smallled6 = tosmallled.led6;
+    
+    bigled1 = tobigled.led1;
+    bigled2 = tobigled.led2;
+    bigled3 = tobigled.led3;
+    bigled4 = tobigled.led4; 
+    bigled5 = tobigled.led5;
+    bigled6 = tobigled.led6;
+    
+    // State machine
+    case(state.q){
+    
+      state.PREP:
+        layer.d = 3b111;
+        if(press_submit.count){
+          timer.reset=1;
+          score.d = 7b0;
+          state.d=state.IDLE;}
+        
+      state.IDLE:
+        layer.d = 3b0;
+        score.d = score.q;
+        //seg.values = {timer.digits[1], timer.digits[0], bin_to_dec.digits[1], bin_to_dec.digits[0]};
+        if(press_r.count|press_g.count|press_b.count|press_y.count){
+          state.d = state.ONE;}
+        if(timer.digits=={4hA,4h0}){state.d = state.END;}
+                 
+      state.ONE:
+        layer.d= 3b1;
+        score.d = score.q;
+        seg.values = {timer.digits[1], timer.digits[0], bin_to_dec.digits[1], bin_to_dec.digits[0]};
+        if(press_r.count|press_g.count|press_b.count|press_y.count){
+          state.d = state.TWO;}
+        if(press_undo.count){
+          state.d = state.IDLE;}
+        if(press_submit.count){
+          alu.alufn = 6h33; //use CMPEQ
+          alu.a = c{ledmatrix.q[5], ledmatrix.q[4],ledmatrix.q[3], ledmatrix.q[2], ledmatrix.q[1],ledmatrix.q[0]};
+          alu.b = c{ledmatrix2.q[5], ledmatrix2.q[4],ledmatrix2.q[3], ledmatrix2.q[2], ledmatrix2.q[1],ledmatrix2.q[0]};
+          if(alu.out==18b1){
+            score.d = score.q + layer.q;
+            bin_to_dec.value = score.q;
+            seg.values[1]=bin_to_dec.digits[1];
+            seg.values[0]=bin_to_dec.digits[0];
+          }  
+          state.d = state.IDLE;}
+          
+        if(timer.digits=={4hA,4h0}){state.d = state.END;}
+          
+      state.TWO:
+        layer.d = 3b10;
+        score.d = score.q;
+        seg.values = {timer.digits[1], timer.digits[0], bin_to_dec.digits[1], bin_to_dec.digits[0]};
+        if(press_r.count|press_g.count|press_b.count|press_y.count){
+          state.d = state.THREE;}
+        if(press_undo.count){
+          state.d = state.ONE;}
+        if(press_submit.count){
+          alu.alufn = 6h33; //use CMPEQ
+          alu.a = c{ledmatrix.q[5], ledmatrix.q[4],ledmatrix.q[3], ledmatrix.q[2], ledmatrix.q[1],ledmatrix.q[0]};
+          alu.b = c{ledmatrix2.q[5], ledmatrix2.q[4],ledmatrix2.q[3], ledmatrix2.q[2], ledmatrix2.q[1],ledmatrix2.q[0]};
+          if(alu.out==18b1){
+            score.d = score.q + layer.q;
+            bin_to_dec.value = score.q;
+            seg.values[1]=bin_to_dec.digits[1];
+            seg.values[0]=bin_to_dec.digits[0];
+          }
+          state.d = state.IDLE;}
+          
+        if(timer.digits=={4hA,4h0}){state.d = state.END;}
+          
+      state.THREE:
+        layer.d = 3b11;
+        score.d = score.q;
+        seg.values = {timer.digits[1], timer.digits[0], bin_to_dec.digits[1], bin_to_dec.digits[0]};
+        if(press_r.count|press_g.count|press_b.count|press_y.count){
+          state.d = state.FOUR;}
+        if(press_undo.count){
+          state.d = state.TWO;}
+        if(press_submit.count){
+          alu.alufn = 6h33; //use CMPEQ
+          alu.a = c{ledmatrix.q[5], ledmatrix.q[4],ledmatrix.q[3], ledmatrix.q[2], ledmatrix.q[1],ledmatrix.q[0]};
+          alu.b = c{ledmatrix2.q[5], ledmatrix2.q[4],ledmatrix2.q[3], ledmatrix2.q[2], ledmatrix2.q[1],ledmatrix2.q[0]};
+          if(alu.out==18b1){ //for more than 16 bits, compare 16 bits first then 
+            score.d = score.q + layer.q;
+            bin_to_dec.value = score.q;
+            seg.values[1]=bin_to_dec.digits[1];
+            seg.values[0]=bin_to_dec.digits[0];
+          }
+          state.d = state.IDLE;}
+          
+        if(timer.digits=={4hA,4h0}){state.d = state.END;}
+          
+      state.FOUR:
+        layer.d = 3b100;
+        score.d = score.q;
+        seg.values = {timer.digits[1], timer.digits[0], bin_to_dec.digits[1], bin_to_dec.digits[0]};
+        if(press_r.count|press_g.count|press_b.count|press_y.count){
+          state.d = state.FIVE;}
+        if(press_undo.count){
+          state.d = state.THREE;}
+        if(press_submit.count){
+          alu.alufn = 6h33; //use CMPEQ
+          alu.a = c{ledmatrix.q[5], ledmatrix.q[4],ledmatrix.q[3], ledmatrix.q[2], ledmatrix.q[1],ledmatrix.q[0]};
+          alu.b = c{ledmatrix2.q[5], ledmatrix2.q[4],ledmatrix2.q[3], ledmatrix2.q[2], ledmatrix2.q[1],ledmatrix2.q[0]};
+          if(alu.out==18b1){
+            score.d = score.q + layer.q;
+            bin_to_dec.value = score.q;
+            seg.values[1]=bin_to_dec.digits[1];
+            seg.values[0]=bin_to_dec.digits[0];
+          }
+          state.d = state.IDLE;}
+          
+        if(timer.digits=={4hA,4h0}){state.d = state.END;}
+          
+        
+        state.FIVE:
+        layer.d = 3b101;
+        score.d = score.q;
+        seg.values = {timer.digits[1], timer.digits[0], bin_to_dec.digits[1], bin_to_dec.digits[0]};
+        if(press_r.count|press_g.count|press_b.count|press_y.count){
+          state.d = state.SIX;}
+        if(press_undo.count){
+          state.d = state.FOUR;}
+        if(press_submit.count){
+          alu.alufn = 6h33; //use CMPEQ
+          alu.a = c{ledmatrix.q[5], ledmatrix.q[4],ledmatrix.q[3], ledmatrix.q[2], ledmatrix.q[1],ledmatrix.q[0]};
+          alu.b = c{ledmatrix2.q[5], ledmatrix2.q[4],ledmatrix2.q[3], ledmatrix2.q[2], ledmatrix2.q[1],ledmatrix2.q[0]};
+          if(alu.out==18b1){
+            score.d = score.q + layer.q;
+            bin_to_dec.value = score.q;
+            seg.values[1]=bin_to_dec.digits[1];
+            seg.values[0]=bin_to_dec.digits[0];
+          }
+          state.d = state.IDLE;}
+          
+        if(timer.digits=={4hA,4h0}){state.d = state.END;}
+          
+        state.SIX:
+        layer.d = 3b110;
+        score.d = score.q;
+        seg.values = {timer.digits[1], timer.digits[0], bin_to_dec.digits[1], bin_to_dec.digits[0]};
+        if(press_undo.count){
+          state.d = state.FIVE;}
+        if(press_submit.count){
+          alu.alufn = 6h33; //use CMPEQ
+          alu.a = c{ledmatrix.q[5], ledmatrix.q[4],ledmatrix.q[3], ledmatrix.q[2], ledmatrix.q[1],ledmatrix.q[0]};
+          alu.b = c{ledmatrix2.q[5], ledmatrix2.q[4],ledmatrix2.q[3], ledmatrix2.q[2], ledmatrix2.q[1],ledmatrix2.q[0]};
+          if(alu.out==18b1){
+            score.d = score.q + layer.q;
+            bin_to_dec.value = score.q;
+            seg.values[1]=bin_to_dec.digits[1];
+            seg.values[0]=bin_to_dec.digits[0];
+          }
+          state.d = state.IDLE;}
+          
+        if(timer.digits=={4hA,4h0}){state.d = state.END;}
+          
+        
+      state.END:
+        timer.reset=1;
+        layer.d = 3b111;
+        score.d = score.q;
+        ledmatrix.d = 6x{{3b0}};
+        ledmatrix2.d = 6x{{3b0}};
+        if(press_undo.count){
+          timer.reset = 0;
+          state.d = state.PREP;}
+        
+      
+
+          
+}
+}
+}

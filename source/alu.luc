@@ -1,0 +1,34 @@
+module alu (
+    input a[18],
+    input b[18],
+    input alufn[6],
+    output out[18]
+  ) {
+  
+  // Connect a, b, and alufn signals of all modules
+  .a(a) {
+    .b(b){
+      .alufn(alufn){
+          adder adder;
+          //boolean boolean; 
+          compare compare;
+          //shifter shifter;
+      }
+    }
+  }
+
+  always {
+    out = 0;
+  // Select which module to use depending on alufn
+    if(alufn == 6h00 | alufn == 6h01){
+      out = adder.out;}
+    else if(alufn == 6h33 | alufn == 6h35 | alufn == 6h37){
+      out = compare.out;}
+    //else if(alufn == 6h18 | alufn == 6h1E | alufn == 6h16 | alufn == 6h1A){
+      //out = boolean.out;}
+    //else if(alufn == 6h20 | alufn == 6h21 | alufn == 6h23){
+      //out = shifter.out;}
+    else{out = 0;}
+    
+  }
+}

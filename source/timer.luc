@@ -1,0 +1,50 @@
+module timer (
+    input clk,                // clock
+    input rst,                // reset
+    input reset,
+    output digits[2][4]  // digit values
+  ) {
+ 
+  .clk(clk) {
+  edge_detector edge_detector;
+  .rst(rst) {
+    counter ctr (#SIZE(1), #DIV(25));
+    fsm state = {IDLE, COUNT, STOP};
+    dff value[16];
+  }
+  }
+  
+  bin_to_dec bin_to_dec(#DIGITS(2));
+  
+ 
+  always {
+    value.d = 16b0;
+    edge_detector.in = ctr.value;
+    bin_to_dec.value = value.q;
+    digits = bin_to_dec.digits;
+    
+    
+    case(state.q){
+      state.IDLE:
+        value.d = 16b11110; // Set to 30
+        if(reset==1){state.d = state.COUNT;} // Start counting down
+          
+      state.COUNT:
+      value.d = value.q;
+      edge_detector.in = ctr.value;
+        if(edge_detector.out){ // Every clk tick, count down
+          if(value.q!=0){ // If value is not 0, -1
+              value.d = value.q - 1;}
+          else{state.d = state.STOP;} // Else, stop the countdown
+        }
+        bin_to_dec.value = value.q;
+        digits = bin_to_dec.digits;
+        
+      state.STOP: // timer is stopped at zero. if reset == 1, restart countdown
+        value.d=value.q;
+        if(rst){state.d = state.IDLE;}
+        if(reset==0){state.d = state.IDLE;}
+      
+  }        
+}
+}

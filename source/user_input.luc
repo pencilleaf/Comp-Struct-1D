@@ -1,0 +1,55 @@
+module userinput_dp (
+    input in[6][3],
+    input layer[3],
+    input rbutton,
+    input bbutton,
+    input gbutton,
+    input ybutton,
+    input undobutton,
+    input submitbutton,
+    output out[6][3]
+  ) {
+
+  always {
+    out = in; // default is off
+
+    if(rbutton&layer==0){out[0] = 3b01;}
+    if(gbutton&layer==0){out[0] = 3b10;}
+    if(bbutton&layer==0){out[0] = 3b11;}
+    if(ybutton&layer==0){out[0] = 3b100;}
+    
+    if(rbutton&layer==1){out[1] = 3b01;}
+    if(gbutton&layer==1){out[1] = 3b10;}
+    if(bbutton&layer==1){out[1] = 3b11;}
+    if(ybutton&layer==1){out[1] = 3b100;}
+    
+    if(rbutton&layer==2){out[2] = 3b01;}
+    if(gbutton&layer==2){out[2] = 3b10;}
+    if(bbutton&layer==2){out[2] = 3b11;}
+    if(ybutton&layer==2){out[2] = 3b100;}
+    
+    if(rbutton&layer==3){out[3] = 3b01;}
+    if(gbutton&layer==3){out[3] = 3b10;}
+    if(bbutton&layer==3){out[3] = 3b11;}
+    if(ybutton&layer==3){out[3] = 3b100;}
+    
+    if(rbutton&layer==4){out[4] = 3b01;}
+    if(gbutton&layer==4){out[4] = 3b10;}
+    if(bbutton&layer==4){out[4] = 3b11;}
+    if(ybutton&layer==4){out[4] = 3b100;}
+    
+    if(rbutton&layer==5){out[5] = 3b01;}
+    if(gbutton&layer==5){out[5] = 3b10;}
+    if(bbutton&layer==5){out[5] = 3b11;}
+    if(ybutton&layer==5){out[5] = 3b100;}
+    
+    if(undobutton&layer==1){out[0] = 3b00;}
+    if(undobutton&layer==2){out[1] = 3b00;}
+    if(undobutton&layer==3){out[2] = 3b00;}
+    if(undobutton&layer==4){out[3] = 3b00;}
+    if(undobutton&layer==5){out[4] = 3b0;}
+    if(undobutton&layer==6){out[5] = 3b0;}
+    
+    if(submitbutton){out = 6x{{3b0}};}
+}
+}
