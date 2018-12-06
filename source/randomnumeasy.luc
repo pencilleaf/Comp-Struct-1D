@@ -1,4 +1,4 @@
-module randomnum (
+module randomnumeasy (
     input clk,
     input in[6][3],
     input rst,
@@ -28,74 +28,55 @@ module randomnum (
       out[1] = pn_gen.num[19:17];
       out[0] = pn_gen.num[17:15];
       
+      // Force only green - 010 (001,101,010,110) and blue - 011 (011,111,100)
       
-      // red = 001 / 101
-      // green = 010 / 110
-      // blue = 011 / 111
-      // yellow = 100
-      
-      if (pn_gen.num[31:29]==3b101){  
-        out[5] = 3b001;}
-      if (pn_gen.num[31:29]==3b110){  
+      if (pn_gen.num[31:29]==3b101|pn_gen.num[31:29]==3b001|pn_gen.num[31:29]==3b110){  
         out[5] = 3b010;}
-      if (pn_gen.num[31:29]==3b111){  
+      if (pn_gen.num[31:29]==3b111|pn_gen.num[31:29]==3b100){  
         out[5] = 3b011;}
         
-      if (pn_gen.num[28:26]==3b101){  
-        out[4] = 3b001;}
-      if (pn_gen.num[28:26]==3b110){  
+      if (pn_gen.num[28:26]==3b101|pn_gen.num[28:26]==3b001|pn_gen.num[28:26]==3b110){  
         out[4] = 3b010;}
-      if (pn_gen.num[28:26]==3b111){  
+      if (pn_gen.num[28:26]==3b111|pn_gen.num[28:26]==3b100){  
         out[4] = 3b011;}
       
-      if (pn_gen.num[25:23]==3b101){  
-        out[3] = 3b001;}
-      if (pn_gen.num[25:23]==3b110){  
+      if (pn_gen.num[25:23]==3b101|pn_gen.num[25:23]==3b001|pn_gen.num[25:23]==3b110){  
         out[3] = 3b010;}
-      if (pn_gen.num[25:23]==3b111){  
+      if (pn_gen.num[25:23]==3b111|pn_gen.num[25:23]==3b100){  
         out[3] = 3b011;}
         
       
-      if (pn_gen.num[22:20]==3b101){  
-        out[2] = 3b001;}
-      if (pn_gen.num[22:20]==3b110){  
+      if (pn_gen.num[22:20]==3b101|pn_gen.num[22:20]==3b001|pn_gen.num[22:20]==3b110){  
         out[2] = 3b010;}
-      if (pn_gen.num[22:20]==3b111){  
+      if (pn_gen.num[22:20]==3b111|pn_gen.num[22:20]==3b100){  
         out[2] = 3b011;}
         
-      if (pn_gen.num[19:17]==3b101){  
-        out[1] = 3b001;}
-      if (pn_gen.num[19:17]==3b110){  
+      if (pn_gen.num[19:17]==3b101|pn_gen.num[19:17]==3b001|pn_gen.num[19:17]==3b110){  
         out[1] = 3b010;}
-      if (pn_gen.num[19:17]==3b111){  
+      if (pn_gen.num[19:17]==3b111|pn_gen.num[19:17]==3b100){  
         out[1] = 3b011;}
         
-      if (pn_gen.num[17:15]==3b101){  
-        out[0] = 3b001;}
-      if (pn_gen.num[17:15]==3b110){  
+      if (pn_gen.num[17:15]==3b101|pn_gen.num[17:15]==3b001|pn_gen.num[17:15]==3b110){  
         out[0] = 3b010;}
-      if (pn_gen.num[17:15]==3b111){  
+      if (pn_gen.num[17:15]==3b111|pn_gen.num[17:15]==3b100){  
         out[0] = 3b011;}
-      
+       
       
       // Make sure that burger does not have blanks in between colours
 
       if (pn_gen.num[31:29]==3b0){  
-        out[5] = 3b1;}
+        out[5] = 3b010;}
       if (pn_gen.num[28:26]==3b0){  
-        out[4] = 3b10;}
+        out[4] = 3b011;}
       if (pn_gen.num[25:23]==3b0){  
-        out[3] = 3b11;}
+        out[3] = 3b010;}
       if (pn_gen.num[22:20]==3b0){  
-        out[2] = 3b10;}
+        out[2] = 3b011;}
       if (pn_gen.num[19:17]==3b0){  
-        out[1] = 3b11;}
+        out[1] = 3b010;}
       if (pn_gen.num[17:15]==3b0){  
-        out[0] = 3b100;}
-      
-      
-      if (pn_gen.num[19:17]==3b100){
-        out[1] = 3b1;}
+        out[0] = 3b011;}
+
       
       // Randomise total number of layers
       if (pn_gen.num[1:0]==2b01){

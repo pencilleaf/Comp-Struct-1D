@@ -12,6 +12,7 @@ module mojo_top (
     output avr_rx,          // AVR RX (FPGA TX)
     input avr_rx_busy,       // AVR RX buffer full
     
+    input switch,
     input rbutton,
     input bbutton,
     input gbutton,
@@ -64,12 +65,13 @@ module mojo_top (
       button_press press_undo;
       
       randomnum randomnum;
+      randomnumeasy randomnumeasy;
       
       fsm state = {PREP,IDLE,ONE,TWO,THREE,FOUR,FIVE,SIX,END};
       dff ledmatrix[6][3];
       dff ledmatrix2[6][3];
-      dff score[7];
-      dff layer[3];
+      dff score[18];
+      dff layer[18];
       
       timer timer;
       multi_seven_seg seg(#DIGITS(4));
@@ -92,12 +94,12 @@ module mojo_top (
     
     // Connect seven seg display to timer and score
     score.d = 7b0;
+    score.d = score.q;
+    
     bin_to_dec.value = score.q;
     seg.values = {timer.digits[1], timer.digits[0], bin_to_dec.digits[1], bin_to_dec.digits[0]};
     timer.reset = 0;
-    //seg.values = {4h0,4h0,bin_to_dec.digits[1], bin_to_dec.digits[0]};
-
-    
+        
     io_seg = seg.seg;
     io_sel = seg.sel;
     
@@ -115,7 +117,6 @@ module mojo_top (
     ybuttonstate = press_y.count;
     submitbuttonstate = press_submit.count;
     undobuttonstate = press_undo.count;
-    
     
     /////////////////// Connect modules /////////////////////
     
@@ -135,11 +136,25 @@ module mojo_top (
     userinput.in = ledmatrix.q; 
     tobigled.in = userinput.out; 
     
+    
+    
     // Connect RNG inputs and outputs
+    randomnum.submitbutton = 0; // default
+    randomnum.in = 6x{{3b0}};
+    
+    // If switch is off, easy mode
+    randomnumeasy.submitbutton = press_submit.count;
+    ledmatrix2.d = randomnumeasy.out;
+    randomnumeasy.in = ledmatrix2.q;
+    tosmallled.in = ledmatrix2.q;
+    
+    
+    // If switch is on, hard mode
+    if(~switch){
     randomnum.submitbutton = press_submit.count;
     ledmatrix2.d = randomnum.out;
     randomnum.in = ledmatrix2.q;
-    tosmallled.in = ledmatrix2.q;
+    tosmallled.in = ledmatrix2.q;}
     
     // Connect to big led matrix and small led matrix
     smallled1 = tosmallled.led1;
@@ -161,155 +176,123 @@ module mojo_top (
     
       state.PREP:
         layer.d = 3b111;
+        score.d = 7b0;
         if(press_submit.count){
           timer.reset=1;
-          score.d = 7b0;
           state.d=state.IDLE;}
         
       state.IDLE:
         layer.d = 3b0;
-        score.d = score.q;
-        //seg.values = {timer.digits[1], timer.digits[0], bin_to_dec.digits[1], bin_to_dec.digits[0]};
         if(press_r.count|press_g.count|press_b.count|press_y.count){
           state.d = state.ONE;}
         if(timer.digits=={4hA,4h0}){state.d = state.END;}
                  
       state.ONE:
-        layer.d= 3b1;
-        score.d = score.q;
-        seg.values = {timer.digits[1], timer.digits[0], bin_to_dec.digits[1], bin_to_dec.digits[0]};
+        layer.d = 3b1;
         if(press_r.count|press_g.count|press_b.count|press_y.count){
           state.d = state.TWO;}
         if(press_undo.count){
           state.d = state.IDLE;}
         if(press_submit.count){
-          alu.alufn = 6h33; //use CMPEQ
-          alu.a = c{ledmatrix.q[5], ledmatrix.q[4],ledmatrix.q[3], ledmatrix.q[2], ledmatrix.q[1],ledmatrix.q[0]};
-          alu.b = c{ledmatrix2.q[5], ledmatrix2.q[4],ledmatrix2.q[3], ledmatrix2.q[2], ledmatrix2.q[1],ledmatrix2.q[0]};
-          if(alu.out==18b1){
-            score.d = score.q + layer.q;
-            bin_to_dec.value = score.q;
-            seg.values[1]=bin_to_dec.digits[1];
-            seg.values[0]=bin_to_dec.digits[0];
-          }  
+          if(ledmatrix.q==ledmatrix2.q){ // if answer is correct
+            alu.alufn = 6h00; // Use alu (ADD) to add points (no. of layers) to score
+            alu.a = layer.q;
+            alu.b = score.q;
+            score.d = alu.out;} 
+          else if(score.q<layer.q){score.d = 18b0;} //else if score is less no. of layers, set score to zero
+          else{score.d = score.q - layer.q;} // else subtract score by no. of layers
           state.d = state.IDLE;}
-          
         if(timer.digits=={4hA,4h0}){state.d = state.END;}
           
       state.TWO:
         layer.d = 3b10;
-        score.d = score.q;
-        seg.values = {timer.digits[1], timer.digits[0], bin_to_dec.digits[1], bin_to_dec.digits[0]};
         if(press_r.count|press_g.count|press_b.count|press_y.count){
           state.d = state.THREE;}
         if(press_undo.count){
           state.d = state.ONE;}
         if(press_submit.count){
-          alu.alufn = 6h33; //use CMPEQ
+          alu.alufn = 6h33; // Use alu (CMPEQ) to compare
           alu.a = c{ledmatrix.q[5], ledmatrix.q[4],ledmatrix.q[3], ledmatrix.q[2], ledmatrix.q[1],ledmatrix.q[0]};
           alu.b = c{ledmatrix2.q[5], ledmatrix2.q[4],ledmatrix2.q[3], ledmatrix2.q[2], ledmatrix2.q[1],ledmatrix2.q[0]};
-          if(alu.out==18b1){
-            score.d = score.q + layer.q;
-            bin_to_dec.value = score.q;
-            seg.values[1]=bin_to_dec.digits[1];
-            seg.values[0]=bin_to_dec.digits[0];
-          }
+          if(alu.out==18b1){ // If answer is correct
+            score.d = score.q + layer.q;} // Add points (no. of layers) to score
+          else if(score.q<layer.q){score.d = 18b0;} //else if score is less no. of layers, set score to zero
+          else{score.d = score.q - layer.q;} // else subtract score by no. of layers
           state.d = state.IDLE;}
-          
         if(timer.digits=={4hA,4h0}){state.d = state.END;}
           
       state.THREE:
         layer.d = 3b11;
-        score.d = score.q;
-        seg.values = {timer.digits[1], timer.digits[0], bin_to_dec.digits[1], bin_to_dec.digits[0]};
         if(press_r.count|press_g.count|press_b.count|press_y.count){
           state.d = state.FOUR;}
         if(press_undo.count){
           state.d = state.TWO;}
         if(press_submit.count){
-          alu.alufn = 6h33; //use CMPEQ
-          alu.a = c{ledmatrix.q[5], ledmatrix.q[4],ledmatrix.q[3], ledmatrix.q[2], ledmatrix.q[1],ledmatrix.q[0]};
-          alu.b = c{ledmatrix2.q[5], ledmatrix2.q[4],ledmatrix2.q[3], ledmatrix2.q[2], ledmatrix2.q[1],ledmatrix2.q[0]};
-          if(alu.out==18b1){ //for more than 16 bits, compare 16 bits first then 
-            score.d = score.q + layer.q;
-            bin_to_dec.value = score.q;
-            seg.values[1]=bin_to_dec.digits[1];
-            seg.values[0]=bin_to_dec.digits[0];
-          }
+          if(ledmatrix.q==ledmatrix2.q){ // If answer is correct
+            score.d = score.q + layer.q;} // Add points (no. of layers) to score
+          else if(score.q<layer.q){score.d = 18b0;} //else if score is less no. of layers, set score to zero
+          else{ // else use alu (SUB) to subtract score by no. of layers
+            alu.alufn = 6h01; 
+            alu.a = score.q;
+            alu.b = layer.q;
+            score.d = alu.out;}
           state.d = state.IDLE;}
-          
         if(timer.digits=={4hA,4h0}){state.d = state.END;}
           
       state.FOUR:
         layer.d = 3b100;
-        score.d = score.q;
-        seg.values = {timer.digits[1], timer.digits[0], bin_to_dec.digits[1], bin_to_dec.digits[0]};
         if(press_r.count|press_g.count|press_b.count|press_y.count){
           state.d = state.FIVE;}
         if(press_undo.count){
           state.d = state.THREE;}
         if(press_submit.count){
-          alu.alufn = 6h33; //use CMPEQ
-          alu.a = c{ledmatrix.q[5], ledmatrix.q[4],ledmatrix.q[3], ledmatrix.q[2], ledmatrix.q[1],ledmatrix.q[0]};
-          alu.b = c{ledmatrix2.q[5], ledmatrix2.q[4],ledmatrix2.q[3], ledmatrix2.q[2], ledmatrix2.q[1],ledmatrix2.q[0]};
-          if(alu.out==18b1){
-            score.d = score.q + layer.q;
-            bin_to_dec.value = score.q;
-            seg.values[1]=bin_to_dec.digits[1];
-            seg.values[0]=bin_to_dec.digits[0];
-          }
+            alu.alufn = 6h35; // Use alu (CMPLT) to check if score is less than no. of layers
+            alu.a = score.q;
+            alu.b = layer.q;
+          if(ledmatrix.q==ledmatrix2.q){ // If answer is correct
+            score.d = score.q + layer.q;} // Add points (no. of layers) to score
+          else if(alu.out==18b1){score.d = 18b0;} //else if score is less no. of layers, set score to zero
+          else{score.d = score.q- layer.q;} // else subtract score by no. of layers
           state.d = state.IDLE;}
-          
         if(timer.digits=={4hA,4h0}){state.d = state.END;}
           
         
         state.FIVE:
         layer.d = 3b101;
-        score.d = score.q;
-        seg.values = {timer.digits[1], timer.digits[0], bin_to_dec.digits[1], bin_to_dec.digits[0]};
         if(press_r.count|press_g.count|press_b.count|press_y.count){
           state.d = state.SIX;}
         if(press_undo.count){
           state.d = state.FOUR;}
         if(press_submit.count){
-          alu.alufn = 6h33; //use CMPEQ
-          alu.a = c{ledmatrix.q[5], ledmatrix.q[4],ledmatrix.q[3], ledmatrix.q[2], ledmatrix.q[1],ledmatrix.q[0]};
-          alu.b = c{ledmatrix2.q[5], ledmatrix2.q[4],ledmatrix2.q[3], ledmatrix2.q[2], ledmatrix2.q[1],ledmatrix2.q[0]};
-          if(alu.out==18b1){
-            score.d = score.q + layer.q;
-            bin_to_dec.value = score.q;
-            seg.values[1]=bin_to_dec.digits[1];
-            seg.values[0]=bin_to_dec.digits[0];
-          }
+          if(ledmatrix.q==ledmatrix2.q){ // if answer is correct
+            alu.alufn = 6h00; // Use alu (ADD) to add points (no. of layers) to score
+            alu.a = layer.q;
+            alu.b = score.q;
+            score.d = alu.out;}
+          else if(score.q<layer.q){score.d = 18b0;} //else if score is less no. of layers, set score to zero
+          else{score.d = score.q - layer.q;} // else subtract score by no. of layers
           state.d = state.IDLE;}
-          
         if(timer.digits=={4hA,4h0}){state.d = state.END;}
           
         state.SIX:
         layer.d = 3b110;
-        score.d = score.q;
-        seg.values = {timer.digits[1], timer.digits[0], bin_to_dec.digits[1], bin_to_dec.digits[0]};
         if(press_undo.count){
           state.d = state.FIVE;}
         if(press_submit.count){
-          alu.alufn = 6h33; //use CMPEQ
+          alu.alufn = 6h33; // Use alu (CMPEQ) to compare
           alu.a = c{ledmatrix.q[5], ledmatrix.q[4],ledmatrix.q[3], ledmatrix.q[2], ledmatrix.q[1],ledmatrix.q[0]};
           alu.b = c{ledmatrix2.q[5], ledmatrix2.q[4],ledmatrix2.q[3], ledmatrix2.q[2], ledmatrix2.q[1],ledmatrix2.q[0]};
-          if(alu.out==18b1){
-            score.d = score.q + layer.q;
-            bin_to_dec.value = score.q;
-            seg.values[1]=bin_to_dec.digits[1];
-            seg.values[0]=bin_to_dec.digits[0];
-          }
+          if(alu.out==18b1){ // If answer is correct
+            score.d = score.q + layer.q;} // Add points (no. of layers) to score
+          else if(score.q<layer.q){score.d = 18b0;} //else if score is less no. of layers, set score to zero
+          else{score.d = score.q - layer.q;} // else subtract score by no. of layers
           state.d = state.IDLE;}
-          
         if(timer.digits=={4hA,4h0}){state.d = state.END;}
           
         
       state.END:
         timer.reset=1;
         layer.d = 3b111;
-        score.d = score.q;
         ledmatrix.d = 6x{{3b0}};
         ledmatrix2.d = 6x{{3b0}};
         if(press_undo.count){

@@ -3,14 +3,15 @@
   <files>
     <src>alu.luc</src>
     <src>timer.luc</src>
-    <src>seven_seg.luc</src>
     <src>multi_seven_seg.luc</src>
     <src>compare.luc</src>
-    <src>adder.luc</src>
     <src top="true">mojo_top.luc</src>
+    <src>randomnum.luc</src>
+    <src>randomnumeasy.luc</src>
+    <src>seven_seg.luc</src>
+    <src>adder.luc</src>
     <src>button_press.luc</src>
     <src>user_input.luc</src>
-    <src>randomnum.luc</src>
     <src>to_led.luc</src>
     <ucf lib="true">mojo.ucf</ucf>
     <ucf>custom.ucf</ucf>

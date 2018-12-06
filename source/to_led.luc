@@ -20,8 +20,7 @@ module toled (
     // green = 010
     // blue = 011 
     // yellow = 100
-    
-    
+
     if(in[0]==3b0){
     led1=4x{0};}
     if(in[0]==3b01){
@@ -33,7 +32,6 @@ module toled (
     if(in[0]==3b100){
     led1=c{1,0,0,0};}
     
-  
     if(in[1]==3b0){
     led2=4x{0};}
     if(in[1]==3b01){
@@ -56,7 +54,6 @@ module toled (
     if(in[2]==3b100){
     led3=c{1,0,0,0};}
       
-    
     if(in[3]==3b0){
     led4=c{0,0,0,0};}
     if(in[3]==3b01){
@@ -67,7 +64,6 @@ module toled (
     led4=c{0,1,0,0};}
     if(in[3]==3b100){
     led4=c{1,0,0,0};}
-      
       
     if(in[4]==3b0){
     led5=c{0,0,0,0};}
